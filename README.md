@@ -341,8 +341,8 @@ echo "{}" > ~/.qwen/sub_state.json
 
 ## 📞 联系方式
 
-- 作者：[Your Name]
-- 项目地址：[https://github.com/YOUR_USERNAME/qwen-sub-agent-system](https://github.com/YOUR_USERNAME/qwen-sub-agent-system)
+- 作者：[scottwyc]
+- 项目地址：[https://github.com/Scottwyc/qwen-sub-agent-system](https://github.com/Scottwyc/qwen-sub-agent-system)
 
 ---
 
