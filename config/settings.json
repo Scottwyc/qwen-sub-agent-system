@@ -1,0 +1,60 @@
+# Qwen Code Sub/Auto Agent 系统配置文件
+
+# 将此文件复制到 ~/.qwen/settings.json 并根据需要修改
+
+{
+  "agent": {
+    "subAgentNotification": {
+      "enabled": true,
+      "description": "子进程/自主进程通知系统配置",
+      "watcherScript": "/home/wuyangcheng/.qwen/scripts/auto-watch-sub.sh",
+      "statusFile": "/home/wuyangcheng/.qwen/sub_status.txt",
+      "alertsFile": "/home/wuyangcheng/.qwen/sub_alerts.txt",
+      "stateFile": "/home/wuyangcheng/.qwen/sub_state.json",
+      "logDir": "/home/wuyangcheng/.qwen/logs",
+      "progressDir": "/home/wuyangcheng/.qwen/progress",
+      "refreshInterval": 5,
+      "notificationDuration": 3000,
+      "detectionLogic": {
+        "taskInProgress": "最后 10 行包含 'esc to cancel'",
+        "waitingForInput": "最后 10 行包含 'Type your message' 或 'YOLO mode' 或 'shift + tab to cycle'",
+        "taskCompleted": "不在进行中 且 在等待输入"
+      },
+      "notificationMethod": "tmux display-message 状态行消息（黄色，持续 3 秒）",
+      "notificationFormat": "⚠️  {session} 任务完成，等待输入!"
+    },
+    "subAgent": {
+      "triggerCommand": "sub",
+      "inheritFullPermissions": true,
+      "backgroundMode": true,
+      "silentBackgroundMode": false,
+      "progressReporting": {
+        "enabled": true,
+        "method": "file",
+        "progressDir": "/home/wuyangcheng/.qwen/progress",
+        "reportOnMilestone": false,
+        "notifyMainProcessOnComplete": true
+      },
+      "allowInterruption": true,
+      "allowSupplementalCommands": true
+    },
+    "autonomousMode": {
+      "enabled": true,
+      "triggerPhrase": "完全自主模式",
+      "triggerCommand": "auto",
+      "maxAutonomy": true,
+      "skipConfirmations": true,
+      "allowFileOperations": true,
+      "allowCodeExecution": true,
+      "allowInstallPackages": false,
+      "silentBackgroundMode": false,
+      "progressReporting": {
+        "enabled": true,
+        "method": "file",
+        "progressDir": "/home/wuyangcheng/.qwen/progress",
+        "reportOnMilestone": false,
+        "notifyMainProcessOnComplete": true
+      }
+    }
+  }
+}

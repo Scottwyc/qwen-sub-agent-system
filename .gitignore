@@ -1,0 +1,33 @@
+# Qwen Code Sub/Auto Agent System .gitignore
+
+# Logs
+*.log
+logs/
+
+# State files
+sub_state.json
+sub_alerts.txt
+sub_status.txt
+
+# Progress files
+progress/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Local configuration
+config/local-settings.json
