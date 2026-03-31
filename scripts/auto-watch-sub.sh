@@ -50,38 +50,29 @@ check_task_completed() {
 # 检查任务是否仍在进行中（检测 esc to cancel）
 check_task_in_progress() {
     local log_file="$1"
-    # 只检查最后 10 行
-    local last_lines=$(tail -10 "$log_file" 2>/dev/null)
-    
+    # 检查最后 15 行
+    local last_lines=$(tail -15 "$log_file" 2>/dev/null)
+
     # 检测 esc to cancel - 这是任务进行中的明确标志
     if echo "$last_lines" | grep -q "esc to cancel"; then
         return 0  # 任务进行中
     fi
-    
+
     return 1  # 未检测到进行中的标志
 }
 
-# 检查是否处于等待输入状态
+# 检查是否处于等待输入状态（检测选项框）
 check_waiting_for_input() {
     local log_file="$1"
-    # 只检查最后 10 行
-    local last_lines=$(tail -10 "$log_file" 2>/dev/null)
-    
-    # 检测标准输入框
-    if echo "$last_lines" | grep -q "Type your message"; then
+    # 检查最后 30 行
+    local last_lines=$(tail -30 "$log_file" 2>/dev/null)
+
+    # 检测选项框：数字打头的选项行（如 "1. "、"2. "、"3. " 等）
+    # 匹配模式：行首是数字 + 点 + 空格 或 数字 + 顿号 + 空格
+    if echo "$last_lines" | grep -qE "^[[:space:]]*[0-9]+[.、] "; then
         return 0
     fi
-    
-    # 检测选项框（shift + tab 循环）
-    if echo "$last_lines" | grep -q "shift + tab to cycle"; then
-        return 0
-    fi
-    
-    # 检测 YOLO mode 循环提示
-    if echo "$last_lines" | grep -q "YOLO mode"; then
-        return 0
-    fi
-    
+
     return 1
 }
 
@@ -98,24 +89,51 @@ while true; do
     fi
 
     for session in $sessions; do
-        log_file=$(ls -t "${LOG_DIR}/${session}"_*.log 2>/dev/null | head -1)
+        # 查找带时间戳的日志文件（最新的一个）
+        log_file=$(ls -t ${LOG_DIR}/${session}_*.log 2>/dev/null | head -1)
 
         if [ -z "$log_file" ] || [ ! -f "$log_file" ]; then
-            continue
+            # 如果日志文件不存在，创建一个（带时间戳，覆盖模式）
+            log_file="${LOG_DIR}/${session}_$(date +%Y%m%d_%H%M%S).log"
+            echo "# ${session} 日志" > "$log_file"
+            echo "启动时间：$(date '+%Y-%m-%d %H:%M:%S')" >> "$log_file"
+            echo "---" >> "$log_file"
+        fi
+
+        # 从 tmux 捕获最新输出（100 行）
+        latest_output=$(tmux capture-pane -p -t "$session" -S -100 2>/dev/null | tail -100)
+        timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+        # 覆盖写入日志文件（只保留最新 100 行）
+        {
+            echo "# ${session} 日志"
+            echo "更新时间：${timestamp}"
+            echo "---"
+            echo "$latest_output"
+        } > "$log_file"
+
+        # 检查任务状态（仅用于通知检测）
+        if check_task_in_progress "$log_file"; then
+            status="🔄 运行中"
+        elif check_waiting_for_input "$log_file"; then
+            status="⏳ 等待输入"
+        else
+            status="❓ 未知状态"
         fi
 
         # 检查是否已经通知过
         if grep -q "\"$session\": *true" "$STATE_FILE" 2>/dev/null; then
+            sleep "$INTERVAL"
             continue
         fi
 
         # 检查任务是否完成且等待输入
         if ! check_task_completed "$log_file"; then
+            sleep "$INTERVAL"
             continue  # 任务未完成或不在等待输入
         fi
 
         # 发送通知
-        timestamp=$(date '+%Y-%m-%d %H:%M:%S')
         alert_msg="[$timestamp] ⚠️  会话 '$session' 任务完成，等待输入中..."
         echo "$alert_msg" >> "$ALERT_FILE"
 
@@ -143,8 +161,28 @@ while true; do
             tmux display-message -t "$TARGET_SESSION" -d 3000 "#[fg=yellow,bold,nounderscore]⚠️  $session 任务完成，等待输入!" 2>/dev/null || true
         fi
 
-        # 记录到日志
-        echo "[$timestamp] 发送通知：$session 任务完成，等待输入" >> "$LOG_DIR/watcher.log"
+        # 记录到日志（覆盖模式，只保留最新状态）
+        {
+            echo "最后更新：$timestamp"
+            echo "会话：$session"
+            echo "状态：任务完成，等待输入"
+            echo ""
+            echo "所有会话状态:"
+            tmux list-sessions 2>/dev/null | grep -E "qwen-(sub|auto)" | while read line; do
+                sess_name=$(echo "$line" | cut -d':' -f1)
+                sess_log=$(ls -t "${LOG_DIR}/${sess_name}"_*.log 2>/dev/null | head -1)
+                if [ -n "$sess_log" ]; then
+                    if check_task_in_progress "$sess_log"; then
+                        sess_status="🔄 运行中"
+                    elif check_waiting_for_input "$sess_log"; then
+                        sess_status="⏳ 等待输入"
+                    else
+                        sess_status="❓ 未知"
+                    fi
+                    echo "  $sess_name: $sess_status"
+                fi
+            done
+        } > "$LOG_DIR/watcher.log"
     done
 
     sleep "$INTERVAL"
