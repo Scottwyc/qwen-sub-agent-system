@@ -31,6 +31,7 @@
 - 📝 **简洁通知**: 只在完成时发送一次黄色状态行消息（持续 3 秒）
 - 📊 **状态跟踪**: 记录已通知会话避免重复通知
 - 🛡️ **安全限制**: 禁止使用删除命令，保护文件安全
+- 🚫 **直接执行**: 子进程内禁止再启动子进程，直接执行任务
 
 ---
 
@@ -57,20 +58,44 @@ auto-watch-sub.sh (监视器，每 5 秒检查) ← 日志文件
 
 ## 🚀 快速开始
 
-### 1. 启动 Sub Agent
+### 方式 1: 使用 prepare-sub-agent.sh（推荐）
 
 ```bash
-bash scripts/tmux-sub-agent.sh qwen-sub-task "你的任务描述"
+# Auto Agent - 完整流程
+bash scripts/prepare-sub-agent.sh auto qwen-auto-mytask "任务描述"
+
+# Sub Agent - 完整流程
+bash scripts/prepare-sub-agent.sh sub qwen-sub-mytask "任务描述"
 ```
 
-### 2. 查看通知
+此方式会自动：
+1. 保存主进程 compress 总结
+2. 生成工作计划
+3. 启动子进程并自动加载上述文档
+
+### 方式 2: 直接使用 sub/auto 命令
+
+```bash
+# Auto Agent - 自动先执行 prepare 流程
+bash scripts/tmux-auto-agent.sh qwen-auto-mytask "任务描述"
+
+# Sub Agent - 自动先执行 prepare 流程
+bash scripts/tmux-sub-agent.sh qwen-sub-mytask "任务描述"
+```
+
+**说明**: `tmux-auto-agent.sh` 和 `tmux-sub-agent.sh` 已更新为：
+1. **首先** 调用 prepare 流程保存主进程总结和工作计划
+2. **然后** 继续原来的流程，加载这些文档到子进程 prompt 中
+3. 子进程执行任务并定期汇报进展
+
+### 查看通知
 
 任务完成后会收到 tmux 状态行通知：
 ```
 ⚠️  qwen-sub-task 任务完成，等待输入!
 ```
 
-### 3. 查看结果
+### 查看结果
 
 ```bash
 # 查看警报通知
@@ -215,13 +240,14 @@ pkill -f "auto-watch-sub.sh"
 ```
 qwen-sub-agent-system/
 ├── scripts/
-│   ├── tmux-sub-agent.sh         # Sub Agent 启动脚本
-│   ├── tmux-auto-agent.sh        # Auto Agent 启动脚本
+│   ├── tmux-sub-agent.sh         # Sub Agent 启动脚本 (v1.3)
+│   ├── tmux-auto-agent.sh        # Auto Agent 启动脚本 (v1.3)
+│   ├── prepare-sub-agent.sh      # 准备并启动子进程 (new)
+│   ├── send-to-sub.sh            # 发送命令到子进程 (new)
 │   ├── auto-watch-sub.sh         # 子进程监视器（核心）
-│   ├── check-sub-status.sh       # 状态检查脚本
-│   └── send-notification.sh      # 通知发送脚本
+│   └── check-sub-status.sh       # 状态检查脚本
 ├── docs/
-│   ├── sub_agent.md              # 完整技能文档
+│   ├── sub_agent.md              # 完整技能文档 (v1.3)
 │   ├── SUB_AUTO_QUICK_REFERENCE.md # 快速参考
 │   └── SUB_AUTO_ARCHITECTURE.md  # 系统架构文档
 ├── config/
@@ -229,7 +255,7 @@ qwen-sub-agent-system/
 │   └── install.sh                # 安装脚本
 ├── examples/
 │   └── examples.md               # 使用示例
-├── README.md                     # 本文件
+├── README.md                     # 本文件 (v1.3)
 └── LICENSE                       # MIT 许可证
 ```
 
@@ -354,4 +380,4 @@ echo "{}" > ~/.qwen/sub_state.json
 ---
 
 *最后更新：2026-04-01*
-*版本：v1.0.0*
+*版本：v1.3 - 集成 prepare 流程，禁止子进程内再启动子进程*
