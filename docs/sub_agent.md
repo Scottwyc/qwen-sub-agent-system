@@ -1136,6 +1136,86 @@ tmux kill-session -t data-gen
 
 ---
 
+## ⚠️ 重要：Qwen 工具超时限制与 tmux 嵌套方案
+
+### 问题背景
+
+Qwen Code 的工具调用有**时长限制**（通常约 2-5 分钟），对于长时间运行的任务（如模型训练、大数据生成）：
+- 工具调用可能超时中断
+- 进程可能被强制终止
+- 任务无法完整执行
+
+### 解决方案：在子进程的 tmux 中再启动 tmux 会话
+
+**允许子进程在自身的 tmux 会话中，再创建嵌套 tmux 会话运行长时间任务**：
+
+```bash
+# ✅ 正确方式：在子进程 tmux 中创建嵌套 tmux 会话
+# 1. 创建嵌套 tmux 会话运行训练任务
+tmux new-session -d -s train-session "python3 train.py --epochs 100"
+
+# 2. 子进程可以继续其他工作或等待
+# 3. 定期检查训练进度
+tmux capture-pane -p -t train-session | tail -30
+
+# 4. 训练完成后清理
+tmux kill-session -t train-session
+```
+
+### 适用场景
+
+| 场景 | 推荐方案 |
+|------|----------|
+| 数据生成（>5 分钟） | tmux 嵌套会话 |
+| 模型训练（>10 分钟） | tmux 嵌套会话 |
+| 大规模评估 | tmux 嵌套会话 |
+| 快速任务（<2 分钟） | 直接前台运行 |
+
+### 进展汇报示例
+
+```markdown
+# qwen-auto-diffusion-train 进展汇报
+
+更新时间：2026-04-02 00:30:00
+状态：🔄 执行中
+
+---
+
+## 当前进展
+
+### 进行中：Diffusion 模型训练
+- 命令：python3 train.py --epochs 100
+- 运行方式：tmux 嵌套会话 (train-session)
+- 开始时间：00:17:49
+- 预计完成：04:30:00
+- 当前状态：Epoch 15/100
+
+### 训练详情
+- GPU: RTX 4090
+- 训练速度：~52 it/s
+- 当前 loss: 0.78
+- 验证 loss: 0.79
+```
+
+### 注意事项
+
+1. **嵌套 tmux 会话管理**：
+   - 使用唯一会话名称避免冲突
+   - 任务完成后及时清理会话
+   - 使用 `tmux list-sessions` 检查活跃会话
+
+2. **进度监控**：
+   - 定期使用 `tmux capture-pane` 获取输出
+   - 将关键进度写入进展文件
+   - 每 10-30 秒检查一次状态
+
+3. **错误处理**：
+   - 检查 tmux 会话是否意外退出
+   - 捕获训练日志中的错误信息
+   - 必要时重启训练任务
+
+---
+
 ## 📁 Scorer-Searcher 项目约定
 
 ### 保存位置
@@ -1346,5 +1426,5 @@ cat /home/wuyangcheng/.qwen/compress_summary.txt
 ---
 
 *此文档由 Qwen Code 生成并维护*
-*最后更新：2026-04-01*
-*版本：v1.7 - 禁止使用"in the background"方式，新增 Scorer-Searcher 项目约定自动注入*
+*最后更新：2026-04-02*
+*版本：v1.8 - 新增 Qwen 工具超时限制与 tmux 嵌套方案（长时间训练任务专用）*
