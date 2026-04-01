@@ -24,13 +24,35 @@ echo "📋 步骤 1: 保存主进程会话总结..."
 COMPRESS_FILE="/home/wuyangcheng/.qwen/compress_summary.txt"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
+# ============================================================================
+# 根据任务内容自动识别项目目录
+# ============================================================================
+
+# 默认项目目录
+PROJECT_BASE="/home/wuyangcheng/code"
+PROJECT_NAME="current-project"
+PROJECT_DIR="$PROJECT_BASE"
+
+# 检测任务中是否包含项目名称关键词
+if [[ "$TASK" == *"scorer"* ]] || [[ "$TASK" == *"Scorer"* ]] || [[ "$SESSION_NAME" == *"scorer"* ]]; then
+    PROJECT_NAME="scorer-searcher"
+    PROJECT_DIR="$PROJECT_BASE/scorer-searcher"
+elif [[ "$TASK" == *"gan"* ]] || [[ "$TASK" == *"GAN"* ]] || [[ "$SESSION_NAME" == *"gan"* ]]; then
+    PROJECT_NAME="gan-decomposer"
+    PROJECT_DIR="$PROJECT_BASE/gan-decomposer"
+elif [[ "$TASK" == *"diffusion"* ]] || [[ "$TASK" == *"Diffusion"* ]] || [[ "$SESSION_NAME" == *"diffusion"* ]]; then
+    PROJECT_NAME="diffusion-model"
+    PROJECT_DIR="$PROJECT_BASE/diffusion-model"
+fi
+
 cat > "$COMPRESS_FILE" << EOF
 # 主进程会话总结
 生成时间：${TIMESTAMP}
 任务：${TASK}
 
 ## 当前上下文
-- 工作目录：/home/wuyangcheng/code
+- 工作目录：$PROJECT_DIR
+- 项目名称：$PROJECT_NAME
 - 会话模式：${MODE}
 - 子进程会话：${SESSION_NAME}
 
@@ -40,7 +62,7 @@ cat > "$COMPRESS_FILE" << EOF
 
 ## 注意事项
 - 子进程将继承此上下文继续执行任务
-- 所有生成的文件应保存到 ~/code/ 目录
+- 所有生成的文件应保存到 $PROJECT_DIR 目录
 - 进展汇报写入：/home/wuyangcheng/.qwen/progress/${SESSION_NAME}.txt
 EOF
 
@@ -49,14 +71,41 @@ echo ""
 
 # 步骤 2: 生成最新工作计划
 echo "📝 步骤 2: 生成工作计划..."
-WORKPLAN_DIR="/home/wuyangcheng/code"
+
+# ============================================================================
+# 根据任务内容自动识别项目目录
+# ============================================================================
+
+# 默认项目目录
+PROJECT_BASE="/home/wuyangcheng/code"
+PROJECT_NAME="current-project"
+PROJECT_DIR="$PROJECT_BASE"
+
+# 检测任务中是否包含项目名称关键词
+if [[ "$TASK" == *"scorer"* ]] || [[ "$TASK" == *"Scorer"* ]] || [[ "$SESSION_NAME" == *"scorer"* ]]; then
+    PROJECT_NAME="scorer-searcher"
+    PROJECT_DIR="$PROJECT_BASE/scorer-searcher"
+elif [[ "$TASK" == *"gan"* ]] || [[ "$TASK" == *"GAN"* ]] || [[ "$SESSION_NAME" == *"gan"* ]]; then
+    PROJECT_NAME="gan-decomposer"
+    PROJECT_DIR="$PROJECT_BASE/gan-decomposer"
+elif [[ "$TASK" == *"diffusion"* ]] || [[ "$TASK" == *"Diffusion"* ]] || [[ "$SESSION_NAME" == *"diffusion"* ]]; then
+    PROJECT_NAME="diffusion-model"
+    PROJECT_DIR="$PROJECT_BASE/diffusion-model"
+fi
+
+# 工作计划目录
+WORKPLAN_DIR="$PROJECT_DIR/workPlan"
 WORKPLAN_FILE="${WORKPLAN_DIR}/QWEN_workPlan_${SESSION_NAME}_$(date +%Y%m%d_%H%M%S).md"
+
+# 创建工作计划目录
+mkdir -p "$WORKPLAN_DIR"
 
 cat > "$WORKPLAN_FILE" << EOF
 # ${SESSION_NAME} 工作计划
 
 **生成时间**: ${TIMESTAMP}
 **任务**: ${TASK}
+**项目**: $PROJECT_NAME ($PROJECT_DIR)
 
 ---
 
@@ -72,11 +121,17 @@ ${TASK}
 - 如任务涉及参数配置，请在所有代码、可视化和文档中明确说明参数值
 
 ### 2. 文件组织
-- 代码文件：\`/home/wuyangcheng/code/\`
-- 数据集：\`/home/wuyangcheng/code/dataset*/\`
-- 模型结果：\`/home/wuyangcheng/code/result/\`
-- 报告文档：\`/home/wuyangcheng/code/\` (使用 \`<task>_report.md\` 命名)
-- 可视化：\`/home/wuyangcheng/code/result/\` (PNG 格式)
+
+#### 项目目录：$PROJECT_DIR
+
+| 文件类型 | 保存位置 | 示例 |
+|----------|----------|------|
+| 代码文件 | \`$PROJECT_DIR/src/\` | \`src/model.py\` |
+| 报告文档 | \`$PROJECT_DIR/docs/\` | \`docs/report.md\` |
+| 结果文件 | \`$PROJECT_DIR/results/\` | \`results/model.pt\` |
+| 配置文件 | \`$PROJECT_DIR/configs/\` | \`configs/config.yaml\` |
+| 脚本文件 | \`$PROJECT_DIR/scripts/\` | \`scripts/train.sh\` |
+| 任务总结 | \`$PROJECT_DIR/\` (根目录) | \`TASK_SUMMARY_*.md\` |
 
 ### 3. 进展汇报
 关键进展写入：\`/home/wuyangcheng/.qwen/progress/${SESSION_NAME}.txt\`

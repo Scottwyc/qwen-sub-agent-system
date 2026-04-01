@@ -76,6 +76,49 @@ check_waiting_for_input() {
     return 1
 }
 
+# 检查是否处于提问状态（检测问句）
+check_asking_question() {
+    local log_file="$1"
+    # 检查最后 30 行
+    local last_lines=$(tail -30 "$log_file" 2>/dev/null)
+
+    # 检测常见提问语句模式
+    # 中文问句：包含"？"或"吗"、"什么"、"怎么"、"如何"、"是否"、"需要"等
+    # 英文问句：包含"?"或"please"、"would you"、"do you"、"should"等
+    if echo "$last_lines" | grep -qE "？|吗 | 什么 | 怎么 | 如何 | 是否 | 需要 | 可以吗 | 好吗|要.*吗"; then
+        return 0
+    fi
+
+    if echo "$last_lines" | grep -qiE "\?|please|would you|do you|should|could you|can you"; then
+        return 0
+    fi
+
+    return 1
+}
+
+# 检查任务是否已完成（等待输入状态）
+# 逻辑：不在进行中（没有 esc to cancel），且有选项框或有提问语句
+check_task_finished() {
+    local log_file="$1"
+
+    # 如果任务还在进行中，返回未完成
+    if check_task_in_progress "$log_file"; then
+        return 1
+    fi
+
+    # 有选项框 → 等待输入
+    if check_waiting_for_input "$log_file"; then
+        return 0
+    fi
+
+    # 有提问语句 → 等待回答（也属于完成状态）
+    if check_asking_question "$log_file"; then
+        return 0
+    fi
+
+    return 1
+}
+
 while true; do
     # 更新状态文件
     ~/.qwen/scripts/check-sub-status.sh --update
@@ -113,12 +156,16 @@ while true; do
         } > "$log_file"
 
         # 检查任务状态（仅用于通知检测）
+        # 逻辑：
+        # 1. 有 esc to cancel → 运行中
+        # 2. 没有 esc to cancel + 有提问语句 → 等待回答（可能有选项框，也可能没有）
+        # 3. 没有 esc to cancel + 没有提问语句 → 已完成 等待输入（可能有选项框，也可能没有）
         if check_task_in_progress "$log_file"; then
             status="🔄 运行中"
-        elif check_waiting_for_input "$log_file"; then
-            status="⏳ 等待输入"
+        elif check_asking_question "$log_file"; then
+            status="❓ 等待回答"
         else
-            status="❓ 未知状态"
+            status="✅ 已完成 等待输入"
         fi
 
         # 检查是否已经通知过
@@ -127,10 +174,10 @@ while true; do
             continue
         fi
 
-        # 检查任务是否完成且等待输入
-        if ! check_task_completed "$log_file"; then
+        # 检查任务是否完成（不在进行中且没有选项框或有提问语句）
+        if ! check_task_finished "$log_file"; then
             sleep "$INTERVAL"
-            continue  # 任务未完成或不在等待输入
+            continue  # 任务未完成
         fi
 
         # 发送通知
@@ -165,7 +212,7 @@ while true; do
         {
             echo "最后更新：$timestamp"
             echo "会话：$session"
-            echo "状态：任务完成，等待输入"
+            echo "状态：任务完成"
             echo ""
             echo "所有会话状态:"
             tmux list-sessions 2>/dev/null | grep -E "qwen-(sub|auto)" | while read line; do
@@ -174,10 +221,10 @@ while true; do
                 if [ -n "$sess_log" ]; then
                     if check_task_in_progress "$sess_log"; then
                         sess_status="🔄 运行中"
-                    elif check_waiting_for_input "$sess_log"; then
-                        sess_status="⏳ 等待输入"
+                    elif check_asking_question "$sess_log"; then
+                        sess_status="❓ 等待回答"
                     else
-                        sess_status="❓ 未知"
+                        sess_status="✅ 已完成 等待输入"
                     fi
                     echo "  $sess_name: $sess_status"
                 fi
