@@ -1,9 +1,10 @@
-# Qwen Code Sub/Auto Agent 消息通知系统
+# Qwen Code Sub/Auto/Long Agent 系统
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Qwen Code](https://img.shields.io/badge/Qwen-Code-blue.svg)](https://github.com/anthropics/qwen-code)
 
 > Qwen Code 子进程控制系统 - 在 tmux 中后台运行子进程，主进程继续与用户交流，任务完成时自动发送通知
+> **新增 Long 模式** - 长时间自主运行模式，适用于模型训练、大规模数据生成等复杂任务
 
 ## 📋 目录
 
@@ -12,6 +13,7 @@
 - [快速开始](#-快速开始)
 - [安装](#-安装)
 - [使用方法](#-使用方法)
+- [Long 模式（新增）](#-long-模式新增)
 - [配置说明](#-配置说明)
 - [文件结构](#-文件结构)
 - [核心组件](#-核心组件)
@@ -32,6 +34,13 @@
 - 📊 **状态跟踪**: 记录已通知会话避免重复通知
 - 🛡️ **安全限制**: 禁止使用删除命令，保护文件安全
 - 🚫 **直接执行**: 子进程内禁止再启动子进程，直接执行任务
+- 🔄 **Long 模式**（新增）: 长时间自主运行模式，支持模型训练、大规模数据生成
+  - 最高权限自主运行（仍禁止 rm 等删除命令）
+  - 自动启动定时监督脚本，定期追踪进度并汇报
+  - 自动启动上下文监督脚本，监控上下文使用并自动压缩
+  - 关键技术进展时自动更新中文技术报告
+  - 脚本更新时自动备份旧版本
+  - **监督完成后自动发送"继续"指令**，让 Long 窗口回到之前任务
 
 ---
 
@@ -202,6 +211,71 @@ pkill -f "auto-watch-sub.sh"
 
 ---
 
+## 🔄 Long 模式（新增）
+
+### 什么是 Long 模式？
+
+Long 模式是在 Sub/Auto Agent 基础上扩展的**长时间自主运行模式**，适用于需要持续运行较长时间才能完成的复杂任务。
+
+**适用场景**:
+- 长时间训练任务（模型训练需要数小时甚至数天）
+- 大规模数据生成（生成大量种子数据集）
+- 复杂实验流程（多步骤实验，需要持续监控和调整）
+- 代码重构 + 测试（大规模代码重构并运行完整测试套件）
+
+### 快速启动
+
+```bash
+# 方式 1: 自然语言触发（推荐）
+long [任务描述]
+
+# 方式 2: 使用 tmux-long-agent.sh 脚本
+bash scripts/tmux-long-agent.sh qwen-long-scorer100 "使用参数 n=50, k=4, p=0.01 生成 100 种子数据集并训练 scorer"
+```
+
+### Long 模式核心特性
+
+| 特性 | Sub 模式 | Auto 模式 | Long 模式 |
+|------|----------|-----------|-----------|
+| **运行时间** | 短-中等 | 中等 | **长时间** |
+| **权限级别** | 标准 | 标准 | **最高权限** |
+| **后台进程** | 禁止 | 禁止 | **允许（nohup）** |
+| **定时监督** | ✅ | ✅ | ✅（默认 5 分钟） |
+| **上下文监督** | ❌ | ❌ | ✅（自动压缩） |
+| **技术报告** | ❌ | ❌ | ✅（自动更新） |
+| **脚本备份** | ❌ | ❌ | ✅（自动备份） |
+
+### 监督脚本工作流程
+
+```
+发送进展查询 → 等待 45 秒 → 捕获输出 → 发送"继续" → 等待下次监督
+```
+
+**为什么需要"继续"指令？**
+- 监督脚本发送的进展查询会打断 Long 窗口的当前任务
+- qwen 回答进展问题后，会等待进一步指示
+- 如果不发送"继续"指令，Long 窗口会卡住等待用户输入
+- 发送"继续"后，qwen 会回到之前被中断的任务
+
+### Long 模式监控命令
+
+```bash
+# 查看进展
+bash scripts/check-progress.sh qwen-long-task
+
+# 查看技术报告
+cat /path/to/project/LONG_MODE_TECH_REPORT_qwen-long-task_*.md
+
+# 发送指令
+bash scripts/send-to-sub.sh qwen-long-task "请暂停当前操作，打印进展总结"
+```
+
+### 完整文档
+
+详见 `docs/long-mode.md` 获取完整的 Long 模式配置指南。
+
+---
+
 ## ⚙️ 配置说明
 
 ### 全局配置 (config/settings.json)
@@ -242,12 +316,16 @@ qwen-sub-agent-system/
 ├── scripts/
 │   ├── tmux-sub-agent.sh         # Sub Agent 启动脚本 (v1.3)
 │   ├── tmux-auto-agent.sh        # Auto Agent 启动脚本 (v1.3)
+│   ├── tmux-long-agent.sh        # Long Agent 启动脚本 (NEW)
+│   ├── long-mode-supervisor.sh   # Long 模式定时监督脚本 (NEW)
+│   ├── long-context-monitor.sh   # Long 模式上下文监督脚本 (NEW)
 │   ├── prepare-sub-agent.sh      # 准备并启动子进程 (new)
 │   ├── send-to-sub.sh            # 发送命令到子进程 (new)
 │   ├── auto-watch-sub.sh         # 子进程监视器（核心）
 │   └── check-sub-status.sh       # 状态检查脚本
 ├── docs/
 │   ├── sub_agent.md              # 完整技能文档 (v1.3)
+│   ├── long-mode.md              # Long 模式完整配置指南 (NEW)
 │   ├── SUB_AUTO_QUICK_REFERENCE.md # 快速参考
 │   └── SUB_AUTO_ARCHITECTURE.md  # 系统架构文档
 ├── config/
@@ -255,7 +333,7 @@ qwen-sub-agent-system/
 │   └── install.sh                # 安装脚本
 ├── examples/
 │   └── examples.md               # 使用示例
-├── README.md                     # 本文件 (v1.3)
+├── README.md                     # 本文件 (v2.0)
 └── LICENSE                       # MIT 许可证
 ```
 
@@ -379,12 +457,39 @@ echo "{}" > ~/.qwen/sub_state.json
 
 ---
 
-*最后更新：2026-04-02*
-*版本：v1.8 - 新增 Qwen 工具超时限制与 tmux 嵌套方案（长时间训练任务专用）*
+*最后更新：2026-04-14*
+*版本：v2.0 - 新增 Long 模式（长时间自主运行模式）*
 
 ---
 
 ## 📝 更新日志
+
+### v2.0 (2026-04-14)
+
+**新增 Long 模式（长时间自主运行模式）:**
+- 🔄 **Long 模式完整支持** - 适用于模型训练、大规模数据生成等长时间任务
+- 📊 **定时监督脚本** - 每 5 分钟自动查询进展并记录
+- 🧠 **上下文监督脚本** - 监控上下文使用，达到阈值时自动压缩
+- 📝 **中文技术报告** - 关键进展时自动更新技术报告
+- 💾 **自动脚本备份** - 脚本更新时自动备份旧版本
+- 🔑 **最高权限自主运行** - 允许后台进程（nohup），仍禁止 rm 等删除命令
+- ⚠️ **监督后自动"继续"** - 监督脚本查询后自动发送"继续"指令，让 Long 窗口回到之前任务
+
+**新增文件:**
+- `scripts/tmux-long-agent.sh` - Long 模式启动脚本
+- `scripts/long-mode-supervisor.sh` - 定时进展监督脚本
+- `scripts/long-context-monitor.sh` - 上下文监控脚本
+- `docs/long-mode.md` - Long 模式完整配置指南
+
+**改进:**
+- 🔄 **监督流程优化** - 监督脚本查询进展后自动发送"继续"指令
+- 📝 **进展查询优化** - 使用更明确的提示词："请简要汇报当前进展...不要展开新操作"
+- ⏰ **响应等待调整** - 从 30 秒调整为 45 秒，给 qwen 更多响应时间
+
+**新增 Long 模式监控命令:**
+- `bash scripts/check-progress.sh qwen-long-task` - 查看进展文件
+- `bash scripts/send-to-sub.sh qwen-long-task "指令"` - 发送指令到 Long 窗口
+- `cat /path/to/project/LONG_MODE_TECH_REPORT_*.md` - 查看技术报告
 
 ### v1.8 (2026-04-02)
 
